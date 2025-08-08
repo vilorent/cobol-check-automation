@@ -15,6 +15,15 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
 
+      # ↓ NECESARIO para que exista el comando `zowe`
+      - name: Set up Node (for Zowe CLI)
+        uses: actions/setup-node@v2
+        with:
+          node-version: '20'
+
+      - name: Install Zowe CLI
+        run: npm install -g @zowe/cli
+
       - name: Setup Mainframe Environment and Upload COBOL Check
         env:
           ZOWE_USERNAME: ${{ secrets.ZOWE_USERNAME }}
