@@ -2,10 +2,17 @@ name: COBOL Check Automation
 on:
   push:
     branches: [ main ]
+
 jobs:
   cobol-check:
     runs-on: ubuntu-latest
-    
+
+    # Constantes visibles (no secrets). Cambia estos valores:
+    env:
+      ZOWE_HOST: "<tu-host-zosmf>"        # ej: zosmf.tu-centro.edu
+      ZOWE_PORT: "443"                    # suele ser 443
+      ZOWE_BASE_PATH: ""                  # deja "" o pon /zosmf si tu sitio lo usa
+
     steps:
       - uses: actions/checkout@v2
 
@@ -15,7 +22,6 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
 
-      # ↓ NECESARIO para que exista el comando `zowe`
       - name: Set up Node (for Zowe CLI)
         uses: actions/setup-node@v2
         with:
@@ -23,6 +29,21 @@ jobs:
 
       - name: Install Zowe CLI
         run: npm install -g @zowe/cli
+
+      - name: Configure Zowe profile (temp)
+        env:
+          ZOWE_USERNAME: ${{ secrets.ZOWE_USERNAME }}
+          ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
+        run: |
+          zowe profiles create zosmf github \
+            --host "$ZOWE_HOST" \
+            --port "$ZOWE_PORT" \
+            --user "$ZOWE_USERNAME" \
+            --password "$ZOWE_PASSWORD" \
+            ${ZOWE_BASE_PATH:+--base-path "$ZOWE_BASE_PATH"} \
+            --reject-unauthorized false
+          zowe profiles set-default zosmf github
+          zowe zosmf check status
 
       - name: Setup Mainframe Environment and Upload COBOL Check
         env:
