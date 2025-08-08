@@ -7,11 +7,11 @@ jobs:
   cobol-check:
     runs-on: ubuntu-latest
 
-    # Constantes visibles (no secrets). Cambia estos valores:
+    # Constantes del entorno (tomadas de tu perfil LearnCOBOL.zosmf)
     env:
-      ZOWE_HOST: "<tu-host-zosmf>"        # ej: zosmf.tu-centro.edu
-      ZOWE_PORT: "443"                    # suele ser 443
-      ZOWE_BASE_PATH: ""                  # deja "" o pon /zosmf si tu sitio lo usa
+      ZOWE_HOST: "204.90.115.200"
+      ZOWE_PORT: "10443"
+      ZOWE_BASE_PATH: ""   # vacío en tu perfil
 
     steps:
       - uses: actions/checkout@v2
@@ -27,8 +27,9 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Zowe CLI
-        run: npm install -g @zowe/cli
+      # Fijamos Zowe CLI v6 para que exista el grupo 'profiles'
+      - name: Install Zowe CLI (v6)
+        run: npm install -g @zowe/cli@6
 
       - name: Configure Zowe profile (temp)
         env:
