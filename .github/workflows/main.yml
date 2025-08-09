@@ -53,3 +53,11 @@ jobs:
         run: |
           chmod +x .github/scripts/zowe_operations.sh
           .github/scripts/zowe_operations.sh
+
+      - name: Run COBOL Check on Mainframe
+        env:
+          ZOWE_USERNAME: ${{ secrets.ZOWE_USERNAME }}
+          ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
+        run: |
+         chmod +x .github/scripts/mainframe_operations.sh
+         .github/scripts/mainframe_operations.sh
