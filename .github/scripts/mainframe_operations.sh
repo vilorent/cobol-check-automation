@@ -1,67 +1,57 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 # mainframe_operations.sh
+set -euo pipefail
 
-# Set up environment
-export PATH=$PATH:/usr/lpp/java/J8.0_64/bin
-export JAVA_HOME=/usr/lpp/java/J8.0_64
-export PATH=$PATH:/usr/lpp/zowe/cli/node/bin
+# Java ya lo instala el workflow; esto es opcional
+java -version || true
 
-# Check Java availability
-java -version
+: "${ZOWE_USERNAME:?ZOWE_USERNAME no definido}"    # viene del workflow
+HLQ="$(echo "$ZOWE_USERNAME" | tr '[:lower:]' '[:upper:]')"   # para datasets
 
-# Set ZOWE_USERNAME
-ZOWE_USERNAME="Z77386" 
-
-# Change to the cobolcheck directory
-cd cobolcheck
+# Ir a la carpeta correcta (ajusta si tu repo usa otro nombre)
+cd cobol-check
 echo "Changed to $(pwd)"
-ls -al
+ls -al || true
 
-# Make cobolcheck executable
-chmod +x cobolcheck
-echo "Made cobolcheck executable"
+# Asegurar ejecutables locales (por si acaso)
+chmod +x cobolcheck || true
+chmod +x scripts/linux_gnucobol_run_tests || true
 
-# Make script in scripts directory executable
-cd scripts
-chmod +x linux_gnucobol_run_tests
-echo "Made linux_gnucobol_run_tests executable"
-cd ..
-
-# Function to run cobolcheck and copy files
 run_cobolcheck() {
-  program=$1
-  echo "Running cobolcheck for $program"
-  # Run cobolcheck, but don't exit if it fails
-  ./cobolcheck -p $program
-  echo "Cobolcheck execution completed for $program (exceptions may have occurred)"
-  # Check if CC##99.CBL was created, regardless of cobolcheck exit status
+  program="$1"
+  echo "=== Running cobolcheck for $program ==="
+  # Ejecuta cobolcheck aunque falle (no abortamos el script)
+  set +e
+  ./cobolcheck -p "$program"
+  ec=$?
+  set -e
+  echo "Cobolcheck exit code for $program: $ec"
+
+  # Subir CC##99.CBL si existe
   if [ -f "CC##99.CBL" ]; then
-  # Copy to the MVS dataset
-    if cp CC##99.CBL "//'${ZOWE_USERNAME}.CBL($program)'"; then
-      echo "Copied CC##99.CBL to ${ZOWE_USERNAME}.CBL($program)"
-    else
-      echo "Failed to copy CC##99.CBL to ${ZOWE_USERNAME}.CBL($program)"
-    fi
+    echo "Uploading CC##99.CBL to $HLQ.CBL($program)"
+    zowe zos-files upload file-to-data-set "CC##99.CBL" "$HLQ.CBL($program)"
   else
     echo "CC##99.CBL not found for $program"
   fi
-  
-# Copy the JCL file if it exists
-if [ -f "${program}.JCL" ]; then
-  if cp ${program}.JCL "//'${ZOWE_USERNAME}.JCL($program)'"; then
-    echo "Copied ${program}.JCL to ${ZOWE_USERNAME}.JCL($program)"
+
+  # Subir el JCL si existe en esta carpeta
+  if [ -f "${program}.JCL" ]; then
+    echo "Uploading ${program}.JCL to $HLQ.JCL($program)"
+    zowe zos-files upload file-to-data-set "${program}.JCL" "$HLQ.JCL($program)"
   else
-  echo "Failed to copy ${program}.JCL to ${ZOWE_USERNAME}.JCL($program)"
+    echo "${program}.JCL not found (skipping upload)"
   fi
-else
-  echo "${program}.JCL not found"
-fi
+
+  # Submit del job (si el miembro existe en el PDS)
+  echo "Submitting $HLQ.JCL($program)..."
+  JOBID=$(zowe jobs submit data-set "$HLQ.JCL($program)" --rff jobid --rft string --wait-for-output true)
+  echo "Submitted: $JOBID"
+  zowe jobs view job-status-by-jobid "$JOBID"
 }
 
-# Run for each program
 for program in NUMBERS EMPPAY DEPTPAY; do
-  run_cobolcheck $program
+  run_cobolcheck "$program"
 done
 
 echo "Mainframe operations completed"
